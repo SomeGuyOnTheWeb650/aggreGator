@@ -10,9 +10,9 @@ type Config struct {
 	Current_user_name string `json:"current_user_name"`
 }
 
-func (c Config) SetUser(user string) {
+func (c *Config) SetUser(user string) error {
 	c.Current_user_name = user
-	write(c)
+	return write(*c)
 }
 
 func getConfigFilePath() (string, error) {
