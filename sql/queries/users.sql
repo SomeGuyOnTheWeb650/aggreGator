@@ -12,7 +12,7 @@ RETURNING *;
 SELECT * FROM users
 WHERE name = $1;
 
--- name: ClearTable :exec
+-- name: ClearUsers :exec
 DELETE FROM users;
 
 -- name: GetUsers :many

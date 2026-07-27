@@ -81,6 +81,8 @@ func main() {
 	commands.register("agg", handlerAgg)
 	commands.register("addfeed", handlerAddFeed)
 	commands.register("feeds", handlerFeeds)
+	commands.register("follow", handlerFeedsFollow)
+	commands.register("following", handlerFeedFollowing)
 	err = commands.run(newState, cmd)
 	if err != nil {
 		fmt.Println(err)

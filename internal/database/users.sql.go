@@ -12,12 +12,12 @@ import (
 	"github.com/google/uuid"
 )
 
-const clearTable = `-- name: ClearTable :exec
+const clearUsers = `-- name: ClearUsers :exec
 DELETE FROM users
 `
 
-func (q *Queries) ClearTable(ctx context.Context) error {
-	_, err := q.db.ExecContext(ctx, clearTable)
+func (q *Queries) ClearUsers(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, clearUsers)
 	return err
 }
 
