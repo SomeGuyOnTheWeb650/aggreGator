@@ -79,10 +79,10 @@ func main() {
 	commands.register("reset", handlerReset)
 	commands.register("users", handlerUsers)
 	commands.register("agg", handlerAgg)
-	commands.register("addfeed", handlerAddFeed)
+	commands.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	commands.register("feeds", handlerFeeds)
-	commands.register("follow", handlerFeedsFollow)
-	commands.register("following", handlerFeedFollowing)
+	commands.register("follow", middlewareLoggedIn(handlerFeedsFollow))
+	commands.register("following", middlewareLoggedIn(handlerFeedFollowing))
 	err = commands.run(newState, cmd)
 	if err != nil {
 		fmt.Println(err)

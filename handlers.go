@@ -96,19 +96,15 @@ func handlerAgg(s *state, cmd command) error {
 	return nil
 }
 
-func handlerAddFeed(s *state, cmd command) error {
-	current_user_name := s.cfg.Current_user_name
-	current_user, err := s.db.GetUser(context.Background(), current_user_name)
-	if err != nil {
-		log.Fatalf("error getting user %w", err)
-	}
+func handlerAddFeed(s *state, cmd command, user database.User) error {
+	
 	feedParams := database.CreateFeedParams{
 		ID: uuid.New(),
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 		Name: cmd.Arguments[0],
 		Url: cmd.Arguments[1],
-		UserID: current_user.ID,
+		UserID: user.ID,
 	}
 	s.db.CreateFeed(context.Background(), feedParams)
 	feedFollowParams := database.CreateFeedFollowParams{
@@ -139,12 +135,8 @@ func handlerFeeds(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFeedsFollow(s *state, cmd command) error {
-	current_user_name := s.cfg.Current_user_name
-	current_user, err := s.db.GetUser(context.Background(), current_user_name)
-	if err != nil {
-		log.Fatalf("error getting user name: %w", err)
-	}
+func handlerFeedsFollow(s *state, cmd command, user database.User) error {
+	
 	url := cmd.Arguments[0]
 	current_url, err := s.db.GetFeedByURL(context.Background(), url)
 	if err != nil {
@@ -154,7 +146,7 @@ func handlerFeedsFollow(s *state, cmd command) error {
 		ID: uuid.New(),
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
-		UserID: current_user.ID,
+		UserID: user.ID,
 		FeedID: current_url.ID,
 	}
 	feed_follow_row, err := s.db.CreateFeedFollow(context.Background(), newFeedFollow)
@@ -162,10 +154,8 @@ func handlerFeedsFollow(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFeedFollowing(s *state, cmd command) error {
-	current_user_name := s.cfg.Current_user_name
-	current_user, err := s.db.GetUser(context.Background(), current_user_name)
-	feed_entries, err := s.db.GetFeedFollowsForUser(context.Background(), current_user.ID)
+func handlerFeedFollowing(s *state, cmd command, user database.User) error {
+	feed_entries, err := s.db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if err != nil {
 		log.Fatalf("something broke in feed retriever: %w", err)
 	}
@@ -181,5 +171,13 @@ func printUser(user database.User) {
 }
 
 func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	return func(s *state, cmd command) error {
+		current_user_name := s.cfg.Current_user_name
+		current_user, err := s.db.GetUser(context.Background(), current_user_name)
+		if err != nil {
+			log.Fatalf("error getting user name with middleware: %w", err)
+	}
+	return handler(s, cmd, current_user)
+	}
 	
 }
