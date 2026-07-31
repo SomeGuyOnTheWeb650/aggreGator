@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 	"errors"
-	
+	"log"
 )
 
 type state struct {
@@ -41,6 +41,13 @@ func (c *commands) register(name string, f func(*state, command) error) {
 }
 
 func main() {
+	f, err := os.OpenFile("logs.log", os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		log.Fatalf("something went wrong trying to log: %w", err)
+		}
+	defer f.Close()
+	log.SetOutput(f)
+	
 	commands := commands{
 		cmds: make(map[string]func(*state, command) error),
 	}
@@ -83,6 +90,8 @@ func main() {
 	commands.register("feeds", handlerFeeds)
 	commands.register("follow", middlewareLoggedIn(handlerFeedsFollow))
 	commands.register("following", middlewareLoggedIn(handlerFeedFollowing))
+	commands.register("unfollow", middlewareLoggedIn(handlerFeedUnfollow))
+	commands.register("browse", middlewareLoggedIn(handlerBrowse))
 	err = commands.run(newState, cmd)
 	if err != nil {
 		fmt.Println(err)

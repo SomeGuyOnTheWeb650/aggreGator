@@ -7,6 +7,8 @@ import (
 	"log"
 	"github.com/google/uuid"
 	"aggreGator/internal/database"
+	"strconv"
+	"database/sql"
 )
 
 func handlerRegister(s *state, cmd command) error {
@@ -87,12 +89,17 @@ func handlerUsers(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	location := "http://www.wagslane.dev/index.xml"
-	feed, err := fetchFeed(context.Background(), location)
+	fmt.Printf("Collecting feeds every 1m0s\n")
+	time_between_requests := cmd.Arguments[0]
+	// time is a string, needs to be a time.Duration
+	duration, err := time.ParseDuration(time_between_requests)
 	if err != nil {
-		log.Fatalf("error fetching feed: %w", err)
+		log.Fatalf("something went wrong parsing time: %w", err)
 	}
-	fmt.Println(feed.Channel.Item)
+	ticker := time.NewTicker(duration)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
 	return nil
 }
 
@@ -165,6 +172,40 @@ func handlerFeedFollowing(s *state, cmd command, user database.User) error {
 	return nil
 }
 
+func handlerFeedUnfollow(s *state, cmd command, user database.User) error {
+	url := cmd.Arguments[0]
+	current_url, err := s.db.GetFeedByURL(context.Background(), url)
+	if err != nil {
+		log.Fatalf("error getting feed by URL, unfollow: %w", err)
+	}
+	err = s.db.DeleteFeedFollow(context.Background(), database.DeleteFeedFollowParams{user.ID, current_url.ID})
+	if err != nil {
+		log.Fatalf("error Deleting Feed Follow: %w", err)
+	}
+	return nil
+}
+
+func handlerBrowse(s *state, cmd command, user database.User) error {
+	limit := 2
+	if len(cmd.Arguments) == 1 {
+		num, err := strconv.Atoi(cmd.Arguments[0])
+		if err != nil {
+			log.Fatalf("str to int conversion failed: %w", err)
+		}
+		limit = num
+	}
+	posts, err := s.db.GetPostsForUser(context.Background(), user.ID)
+	if err != nil {
+		log.Fatalf("something went wrong looking for posts: %w", err)
+	}
+	for _, post := range posts[:limit] {
+		fmt.Printf("%v\n",post.Title)
+		fmt.Printf("%v\n",post.Description)
+		fmt.Printf("%v\n",post.PublishedAt)
+	}
+	return nil
+}
+
 func printUser(user database.User) {
 	fmt.Printf(" * ID:		%v\n", user.ID)
 	fmt.Printf(" * Name:	%v\n", user.Name)
@@ -181,3 +222,46 @@ func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) 
 	}
 	
 }
+
+func scrapeFeeds(s *state) {
+	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		log.Fatalf("couldn't fetch next feed: %w", err)
+	}
+	err = s.db.MarkFeedFetched(context.Background(), nextFeed.ID)
+	if err != nil {
+		log.Fatalf("something happened when marking feed fetched: %w", err)
+	}
+	fetchedRSS, err := fetchFeed(context.Background(), nextFeed.Url)
+	if err != nil {
+		log.Fatalf("something went wrong getting feed via url: %w", err)
+	}
+	var layouts = []string{time.RFC3339, "2006-01-02", "02/01/2006", time.RFC1123Z}
+	for _, items := range fetchedRSS.Channel.Item {
+		var t sql.NullTime	
+		for _, layout := range layouts {
+			t.Time, err = time.Parse(layout, items.PubDate)
+			if err == nil {
+				t.Valid = true
+				break
+			}
+		}
+		if err != nil {
+			log.Println("This is an unknown timestamp layout: %v", items.PubDate)
+			log.Println("From this URL: %v", items.Link)
+
+		}
+		post := database.CreatePostParams{
+			ID: uuid.New(),
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
+			Title: items.Title,
+			Url: items.Link,
+			Description: items.Description,
+			PublishedAt: t,
+			FeedID: nextFeed.ID,
+		}
+		s.db.CreatePost(context.Background(), post)
+		fmt.Printf("making sure we got here")
+	}
+	}
