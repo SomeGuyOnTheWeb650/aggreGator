@@ -1,7 +1,2 @@
-# setup go build
-go mod init "name of module" ## no quotes
-git init
-touch .gitignore
-add sensitive stuff to gitignore
-make a main.go file package main
-build like that
+In order to use this program, you need Postgres and Go
+Goose would be helpful for migration tracking
